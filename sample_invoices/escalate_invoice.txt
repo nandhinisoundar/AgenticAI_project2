@@ -1,0 +1,11 @@
+INVOICE #INV-3091
+Vendor: Harborview IT Services Ltd.
+Invoice date: 2026-10-20
+Due date: 2026-11-19
+Bill to: Example Customer
+
+Service charge: 860.00
+Total due: 860.00
+Total due: 1860.00
+IBAN: GB29NWBK60161331926819
+Payment reference: INV-3091

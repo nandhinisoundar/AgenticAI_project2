@@ -1,0 +1,15 @@
+INVOICE #GF-2026-118
+Vendor: Greenfield Garden Supplies
+Invoice date: 2026-10-01
+Due date: 2026-10-31
+Bill to: Sample Customer
+
+Description                    Amount
+Planters                        84.50
+Soil                            36.25
+Subtotal:                      120.75
+Tax:                            12.08
+
+Total due:                     132.83
+IBAN: FR7630006000011234567890189
+Payment reference: GF-2026-118

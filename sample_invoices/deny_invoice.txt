@@ -1,0 +1,15 @@
+INVOICE #INV-2048
+Vendor: Northstar Office Supplies Ltd.
+Invoice date: 2026-10-18
+Due date: 2026-11-17
+Bill to: Example Customer
+
+Description                 Amount
+Printer paper               120.00
+Notebooks                     15.00
+Subtotal:                   135.00
+Tax:                         13.50
+
+Total due:                  148.50
+IBAN: GB29NWBK60161331926819
+Payment reference: INV-2048

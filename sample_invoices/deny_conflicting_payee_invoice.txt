@@ -1,0 +1,15 @@
+INVOICE #CP-5508
+Vendor: Cedar Point Printworks
+Invoice date: 2026-10-10
+Due date: 2026-11-09
+Bill to: Sample Customer
+
+Description                    Amount
+Brochure printing             320.00
+Binding                         40.00
+Subtotal:                      360.00
+Tax:                            36.00
+
+Total due:                     396.00
+IBAN: GB29NWBK60161331926819
+Payment reference: CP-5508

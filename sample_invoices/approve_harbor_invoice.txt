@@ -1,0 +1,15 @@
+INVOICE #HB-7714
+Vendor: Harborview IT Services Ltd.
+Invoice date: 2026-09-22
+Due date: 2026-10-22
+Bill to: Sample Customer
+
+Service                        Amount
+Network monitoring             480.00
+Support plan                   120.00
+Subtotal:                      600.00
+Tax:                            60.00
+
+Total due:                     660.00
+IBAN: DE89370400440532013000
+Payment reference: HB-7714

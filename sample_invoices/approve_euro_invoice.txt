@@ -1,0 +1,16 @@
+INVOICE #EU-4402
+Vendor: Alpine Office GmbH
+Invoice date: 2026-10-12
+Due date: 2026-11-11
+Bill to: Sample Customer
+Currency: EUR
+
+Description                    Amount
+Desk lamps                     210.00
+Delivery                        18.00
+Subtotal:                      228.00
+VAT:                            43.32
+
+Total due:                     271.32 EUR
+IBAN: DE89370400440532013000
+Payment reference: EU-4402
