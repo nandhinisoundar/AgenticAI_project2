@@ -41,7 +41,9 @@ def test_sweep_expands_cases_policies_budgets_and_summarizes(monkeypatch):
     assert all(row["reviewer_input_tokens"] == 120 for row in summary)
     assert all(row["reviewer_output_tokens"] == 32 for row in summary)
     assert {kwargs["offline_reviewer"] for kwargs in seen} == {True}
-    assert any(row["policy"] == "agentdojo-tiered" and row["hitl_load"] == 4 for row in summary)
+    # HITL counts reviewer calls on successful CLEAN runs only (2 clean runs x 1 call).
+    assert any(row["policy"] == "agentdojo-tiered" and row["hitl_load"] == 2 for row in summary)
+    assert all(row["clean_runs"] == 2 and row["attack_runs"] == 2 for row in summary)
 
 
 def test_suite_choices_reads_installed_agentdojo_ids(monkeypatch):

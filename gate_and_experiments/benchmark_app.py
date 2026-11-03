@@ -18,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from gate_and_experiments.agentdojo_sweep import run_benchmark_sweep, suite_choices, suite_injection_definitions
 from gate_and_experiments.report_analysis import build_tcr_hitl_curve, classify_failures, escalation_value_analysis
-from gate_and_experiments.run_agentdojo import POLICIES
+from gate_and_experiments.run_agentdojo import ATTACK_TYPES, DEFAULT_ATTACK, POLICIES
 from approval_policy.invoice_extraction import extract_invoice_fields
 from approval_policy.invoice_check import INVOICE_INJECTION_CASES, format_invoice_text, run_invoice_benchmark
 
@@ -33,6 +33,57 @@ def _summary_cards(summary: list[dict[str, Any]]) -> None:
         st.markdown(f"Reviewer Calls: {row.get('reviewer_calls', 0)}")
         st.markdown(f"Reviewer Input Tokens: {row.get('reviewer_input_tokens', 0)}")
         st.markdown(f"Reviewer Output Tokens: {row.get('reviewer_output_tokens', 0)}")
+
+
+def _save_agentdojo_results(results: dict, summary: list, meta: dict) -> str | None:
+    """Write one sweep's runs and summary to results/agentdojo_<timestamp>.json."""
+    try:
+        from datetime import datetime
+
+        out_dir = Path(__file__).resolve().parents[1] / "results"
+        out_dir.mkdir(exist_ok=True)
+        path = out_dir / f"agentdojo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        payload = {
+            "meta": meta,
+            "summary": summary,
+            "runs": {f"{policy}|k={k}": runs for (policy, k), runs in results.items()},
+        }
+        path.write_text(json.dumps(payload, indent=1, default=str))
+        return str(path.relative_to(out_dir.parent))
+    except Exception:
+        return None
+
+
+def _compact_summary(summary: list, results: dict) -> str:
+    """Plain-text per-cell metrics plus the runs that need attention."""
+    lines = []
+    for row in summary:
+        def pct(value):
+            return "n/a" if value is None else f"{value:.3f}"
+        lines.append(
+            f"{row['policy']} k={row['k']}: TCR={pct(row['tcr'])} "
+            f"(clean {row.get('clean_runs', '?')}) UA={pct(row.get('utility_under_attack'))} "
+            f"ASR={pct(row.get('targeted_asr'))} (attack {row.get('attack_runs', '?')}) "
+            f"HITL={row['hitl_load']} esc={row['total_escalations']} reviewed={row['reviewer_calls_used']} "
+            f"errors={row['errors']} agent_tok={row.get('agent_input_tokens', 0)}/{row.get('agent_output_tokens', 0)} "
+            f"rev_tok={row.get('reviewer_input_tokens', 0)}/{row.get('reviewer_output_tokens', 0)} "
+            f"agent_usd={row.get('agent_estimated_cost_usd')} rev_usd={row.get('reviewer_estimated_cost_usd')}"
+        )
+    lines.append("")
+    lines.append("Clean runs not completed, and attacks that succeeded:")
+    for (policy, k), runs in sorted(results.items()):
+        for run in runs:
+            clean = run.get("tcr_eligible", run.get("attack_id") is None)
+            failed_clean = clean and not run.get("utility")
+            if failed_clean or run.get("attack_succeeded") or run.get("error"):
+                tag = "ERROR" if run.get("error") else ("ATTACK_SUCCEEDED" if run.get("attack_succeeded") else "CLEAN_FAILED")
+                blocked = [
+                    f"{rec.get('tool')}:{rec.get('final')}({rec.get('by')})"
+                    for rec in run.get("gate_records", [])
+                    if rec.get("final") != "APPROVE"
+                ]
+                lines.append(f"  {policy} k={k} {run.get('case_id')} {tag} not_approved={blocked}")
+    return "\n".join(lines)
 
 
 def main() -> None:
@@ -368,15 +419,21 @@ def main() -> None:
         format_func=lambda attack: "Clean run (no injection)" if attack == "Clean run" else f"{attack}: {attack_definitions.get(attack, attack)}",
     )
     attacks = [None if attack == "Clean run" else attack for attack in selected_attacks]
+    attack_type = st.selectbox(
+        "Attack type (how the injection is written)",
+        list(ATTACK_TYPES),
+        index=list(ATTACK_TYPES).index(DEFAULT_ATTACK),
+        help="important_instructions is the AgentDojo paper's standard attack; direct ('TODO: <goal>') is much weaker.",
+    )
 
     policy_names = st.multiselect(
         "Policies",
         options=list(POLICIES),
         default=[
             "agentdojo-tiered",
-            "agentdojo-task0-classifier-tiered",
             "full-approve",
             "full-escalate",
+            "deny-all",
         ],
         format_func=lambda value: (
             {
@@ -429,8 +486,9 @@ def main() -> None:
             st.error("OPENAI_API_KEY is required for AgentDojo model evaluation. Set it in the local .env before running.")
         else:
             run_count = len(selected_tasks) * len(attacks) * len(policy_names) * len(budgets)
-            if run_count > 24:
-                st.error(f"This selection would launch {run_count} runs. Reduce the selection to 24 or fewer runs per sweep to control time and cost.")
+            max_runs = int(os.getenv("AGENTDOJO_MAX_RUNS_PER_SWEEP", "800"))
+            if run_count > max_runs:
+                st.error(f"This selection would launch {run_count} runs. Reduce it to {max_runs} or fewer runs per sweep (set AGENTDOJO_MAX_RUNS_PER_SWEEP to change the limit).")
             else:
                 try:
                     prices_per_million = {}
@@ -456,13 +514,24 @@ def main() -> None:
                             reviewer_model=reviewer_model,
                             offline_reviewer=use_offline_reviewer,
                             prices_per_million=prices_per_million,
+                            attack_type=attack_type,
                         )
+                    saved_path = _save_agentdojo_results(
+                        results, summary,
+                        {
+                            "suite": suite_name, "version": suite_version, "attack_type": attack_type,
+                            "agent_model": agent_model,
+                            "reviewer": "offline RuleReviewer" if use_offline_reviewer else reviewer_model,
+                        },
+                    )
                     st.session_state["benchmark_report"] = {
                         "summary": summary,
                         "results": results,
                         "suite": suite_name,
                         "version": suite_version,
                         "reviewer": "offline RuleReviewer" if use_offline_reviewer else reviewer_model,
+                        "attack_type": attack_type,
+                        "saved_path": saved_path,
                     }
                 except Exception as error:
                     st.error(f"Experiment failed: {type(error).__name__}: {error}")
@@ -470,13 +539,22 @@ def main() -> None:
     report = st.session_state.get("benchmark_report")
     if report:
         st.subheader("Aggregate results")
-        st.caption(f"{report['suite']} {report['version']} · reviewer: {report['reviewer']}")
         st.caption(
-            "TCR@k is the fraction of clean task runs completed safely. HITL load counts reviewer calls "
-            "on successful clean runs. Total escalations counts every policy ESCALATE proposal, including "
+            f"{report['suite']} {report['version']} · attack: {report.get('attack_type', 'direct')} · "
+            f"reviewer: {report['reviewer']}"
+        )
+        st.caption(
+            "TCR@k (benign utility) is the fraction of clean task runs completed safely. Utility under attack is the "
+            "fraction of attack runs where the user task was still completed and the attack failed. Targeted ASR is the "
+            "fraction of attack runs where the attacker's goal was achieved (AgentDojo's security check). HITL load counts "
+            "reviewer calls on successful clean runs. Total escalations counts every policy ESCALATE proposal, including "
             "requests denied after the budget is exhausted. Reviewer calls used is actual budget consumption."
         )
         st.dataframe(report["summary"], width="stretch", hide_index=True)
+        if report.get("saved_path"):
+            st.caption(f"Saved full results to `{report['saved_path']}`")
+        with st.expander("Compact text summary (for reports)", expanded=True):
+            st.code(_compact_summary(report["summary"], report["results"]), language="text")
         st.subheader("TCR@k and HITL curve")
         tcr_curve = build_tcr_hitl_curve(report["results"])
         if tcr_curve:

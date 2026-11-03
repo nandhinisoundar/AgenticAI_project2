@@ -6,7 +6,7 @@ from typing import Any
 from agentdojo.task_suite.load_suites import get_suite
 
 from gate_and_experiments.experiments import run_sweep
-from gate_and_experiments.run_agentdojo import POLICIES, run_one
+from gate_and_experiments.run_agentdojo import DEFAULT_ATTACK, POLICIES, run_one
 
 
 def suite_choices(suite_version: str, suite_name: str) -> tuple[list[str], list[str]]:
@@ -38,6 +38,7 @@ def run_benchmark_sweep(
     reviewer_model: str,
     offline_reviewer: bool,
     prices_per_million: dict[str, dict[str, float]] | None = None,
+    attack_type: str = DEFAULT_ATTACK,
 ) -> tuple[dict[tuple[str, int], list[dict[str, Any]]], list[dict[str, Any]]]:
     """Run the selected matrix through the shared sweep and metric functions."""
     unknown_policies = set(policy_names) - set(POLICIES)
@@ -66,6 +67,7 @@ def run_benchmark_sweep(
             offline_reviewer=offline_reviewer,
             reviewer_model=reviewer_model,
             prices_per_million=prices_per_million,
+            attack_type=attack_type,
         )
         return {
             **report,
@@ -76,6 +78,7 @@ def run_benchmark_sweep(
             ),
             "reviewer_calls_used": report.get("escalations_used") or 0,
             "error": False,
+            "tcr_eligible": case["attack_id"] is None,
         }
 
     results, summary = run_sweep(policy_specs, budgets, cases, run_case)

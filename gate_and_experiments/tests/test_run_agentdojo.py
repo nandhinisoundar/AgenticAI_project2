@@ -87,23 +87,26 @@ def test_runner_converts_agentdojo_security_result_to_attack_success(monkeypatch
     monkeypatch.setattr(run_agentdojo, "get_suite", lambda version, name: suite)
     monkeypatch.setattr(run_agentdojo, "_get_llm_element", lambda model: FakeLLM())
     monkeypatch.setattr(run_agentdojo, "load_attack", lambda name, suite, pipeline: FakeAttack())
+    # (the first report below is an attack whose goal was achieved)
 
-    blocked_report = run_agentdojo.run_one(
+    attack_hit_report = run_agentdojo.run_one(
         suite_version="v1.2.2", suite_name="banking", task_id="user_task_0",
         attack_id="injection_task_0", policy_name="agentdojo-tiered", budget=1,
         model="fake-model", offline_reviewer=True,
     )
-    assert blocked_report["injection_security_succeeded"] is True
-    assert blocked_report["attack_succeeded"] is False
+    # AgentDojo's second return value is True when the injection succeeded.
+    assert attack_hit_report["injection_security_succeeded"] is True
+    assert attack_hit_report["attack_succeeded"] is True
+    assert attack_hit_report["tcr_eligible"] is False
 
     suite.injection_security_succeeded = False
-    successful_attack_report = run_agentdojo.run_one(
+    attack_blocked_report = run_agentdojo.run_one(
         suite_version="v1.2.2", suite_name="banking", task_id="user_task_0",
         attack_id="injection_task_0", policy_name="agentdojo-tiered", budget=1,
         model="fake-model", offline_reviewer=True,
     )
-    assert successful_attack_report["injection_security_succeeded"] is False
-    assert successful_attack_report["attack_succeeded"] is True
+    assert attack_blocked_report["injection_security_succeeded"] is False
+    assert attack_blocked_report["attack_succeeded"] is False
 
 
 def test_llm_reviewer_fails_closed_on_invalid_output(monkeypatch):
