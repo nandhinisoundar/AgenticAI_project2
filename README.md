@@ -34,11 +34,28 @@ For online AgentDojo runs, set the provider API key in the local ignored `.env`,
 python -m streamlit run gate_and_experiments/benchmark_app.py
 ```
 
-The UI selects AgentDojo tasks and optional injection scenarios, policies, and escalation budgets, then reports TCR@k/HITL rows by budget, escalation requests, reviewer calls used, and gate trajectories. Both AgentDojo and Custom invoice results include cross-budget outcome comparisons and representative failure-candidate trajectories. Outcome-only failures are flagged as candidates for manual trajectory adjudication, not asserted as confirmed safe/unsafe actions. Use the LLM reviewer for evaluation; offline `RuleReviewer` is a harness smoke test only. Model calls may incur API charges.
+The AgentDojo UI selects suite tasks, clean/injection cases, attack type, policies, escalation budgets, and model/reviewer settings. It runs each selected task × case × policy × budget combination; `AGENTDOJO_MAX_RUNS_PER_SWEEP` sets the run-count limit (default 800). Results include TCR@k, HITL, attack outcomes, escalation requests, reviewer calls used, token usage, and gate trajectories. Both AgentDojo and Custom invoice modes also compare outcomes across budgets and show failure candidates with representative traces. Candidate labels require manual trajectory review; they are not automatically adjudicated policy failures. Use the LLM reviewer for evaluation; offline `RuleReviewer` is a harness smoke test only. Model calls may incur API charges.
 
 Agent and reviewer completion token usage is captured when the provider returns usage metadata. To estimate USD cost, enter the actual per-million input/output prices in the UI or set `AGENT_INPUT_PRICE_PER_MILLION`, `AGENT_OUTPUT_PRICE_PER_MILLION`, `REVIEWER_INPUT_PRICE_PER_MILLION`, and `REVIEWER_OUTPUT_PRICE_PER_MILLION`. Unconfigured costs are left unknown; rule-based policy inference has zero API cost. See [REPORT_TEMPLATE.md](REPORT_TEMPLATE.md) for the assignment report structure.
 
 Agent usage is metered from OpenAI-compatible chat-completion responses; providers that omit usage metadata will not contribute token counts. The pricing inputs must match the selected provider/model and pricing date. The **Failure classification and escalation value** panel provides run-level candidates and tool-level escalation counts; inspect representative trajectories and adjudicate failure types before using those candidates as report findings.
+
+## Saved AgentDojo Evaluation
+
+The `results/` folder contains the localhost test report and raw JSON exports. The report covers banking v1.2.2, all 16 user tasks, clean plus injection tasks 0–8, and the `important_instructions` attack type. The eight completed policy/budget cells total 1,280 runs with no recorded errors. A first Full Escalate attempt hit the provider credit limit at k=1; its incomplete k=1/k=2 rows are excluded, and the completed cells were rerun. See [the detailed test report](results/AgentDojo_Localhost_Test_Report.md) for run files, denominators, scores, failure trajectories, reviewer usage, and cost assumptions.
+
+Headline saved results:
+
+| Policy | k | Clean TCR | Attack outcome |
+|---|---:|---:|---|
+| AgentDojo Tiered | 0 | 10/16 (62.5%) | 144/144 blocked |
+| AgentDojo Tiered | 1 | 9/16 (56.25%) | 144/144 blocked |
+| AgentDojo Tiered | 2 | 9/16 (56.25%) | 144/144 blocked |
+| Full Escalate | 0–2 | 5/16 (31.25%) | 144/144 blocked at each budget |
+| Full Approve | 0 | 8/16 (50%) | 62/144 attack goals succeeded (targeted ASR 43.1%) |
+| Deny All | 0 | 5/16 (31.25%) | 144/144 blocked |
+
+HITL is the reviewer-call count on successful clean tasks; total escalation requests can exceed reviewer calls because requests after budget exhaustion are denied without invoking the reviewer. Results are one saved evaluation, not a guarantee of performance on other models, suites, or seeds. The Task 0 classifier and custom invoice harness are not part of this all-task score table.
 
 Run one task from the CLI:
 
